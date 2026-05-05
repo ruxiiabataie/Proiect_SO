@@ -5,6 +5,10 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <fcntl.h>
+#include <sys/wait.h>
+#include <signal.h>
+
+
 
 #include "commands.h"
 #include "../models/report.h"
@@ -16,6 +20,8 @@
 #define REPORTS_FILE "reports.dat"
 #define CFG_FILE "district.cfg"
 
+
+
 // ----------------------
 // HELPERS
 // ----------------------
@@ -26,6 +32,31 @@ void build_path(char *dest, const char *district, const char *file) {
 
 void ensure_directory(const char *district) {
     mkdir(district, 0750);
+}
+
+int notify_monitor()
+{
+    int fd;
+    char buffer[32];
+    pid_t pid;
+
+    fd = open(".monitor_pid", O_RDONLY);
+    if (fd < 0)
+        return -1;
+
+    int n = read(fd, buffer, sizeof(buffer) - 1);
+    close(fd);
+
+    if (n <= 0)
+        return -1;
+
+    buffer[n] = '\0';
+    pid = (pid_t) atoi(buffer);
+
+    if (kill(pid, SIGUSR1) < 0)
+        return -1;
+
+    return 0;
 }
 
 // ----------------------
@@ -148,6 +179,11 @@ void handle_add(const char *role, const char *user, const char *district) {
     }
 
     printf("[ADD] Report created with ID %d\n", r.id);
+    if (notify_monitor() == 0) {
+        log_action(district, role, user, "Monitor notified successfully");
+    } else {
+        log_action(district, role, user, "Monitor could not be informed");
+    }
 
     // ----------------------
     // SYMLINK
@@ -276,6 +312,41 @@ void handle_remove(const char *role, const char *district, int report_id) {
         printf("[REMOVE] Report %d deleted\n", report_id);
     } else {
         printf("Report not found\n");
+    }
+}
+
+
+void handle_remove_district(const char *role, const char *district)
+{
+    // 1. verificare rol
+    if (strcmp(role, "manager") != 0) {
+        printf("Permission denied: only manager can remove districts\n");
+        return;
+    }
+
+    // 2. ștergere symlink
+    char link_name[256];
+    snprintf(link_name, sizeof(link_name), "active_reports-%s", district);
+    unlink(link_name);
+
+    // 3. fork
+    pid_t pid = fork();
+
+    if (pid == 0) {
+        // copil → exec rm -rf
+        execlp("rm", "rm", "-rf", district, NULL);
+
+        // dacă exec eșuează
+        perror("exec failed");
+        exit(1);
+    }
+    else if (pid > 0) {
+        // părinte → așteaptă
+        wait(NULL);
+        printf("[REMOVE_DISTRICT] %s deleted\n", district);
+    }
+    else {
+        perror("fork failed");
     }
 }
 

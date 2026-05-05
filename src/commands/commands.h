@@ -19,4 +19,7 @@ void handle_update_threshold(const char *role, const char *district, int value);
 // FILTER
 void handle_filter(const char *role, const char *district, int argc, char *argv[], int start_index);
 
+//  REMOVE DISTRICT
+void handle_remove_district(const char *role, const char *district);
+
 #endif

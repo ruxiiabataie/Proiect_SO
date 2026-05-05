@@ -15,3 +15,6 @@ all:
 
 clean:
 	rm -f $(OUT)
+
+monitor:
+	$(CC) src/monitor_reports.c -o monitor_reports

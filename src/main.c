@@ -83,6 +83,10 @@ int main(int argc, char *argv[]) {
 
         handle_filter(role, district, argc, argv, 7);
     }
+    // REMOVE DISTRICT
+    else if (strcmp(command, "--remove_district") == 0) {
+    handle_remove_district(role, district);
+}
 
     // ----------------------
     // INVALID

@@ -1,1 +1,6 @@
 1777193131 | manager | alice | ADD
+1777979415 | inspector | bob | Monitor could not be informed
+1777979595 | inspector | bob | Monitor notified successfully
+1777979664 | inspector | bob | Monitor notified successfully
+1777979797 | inspector | bob | Monitor could not be informed
+1777979801 | inspector | bob | Monitor could not be informed
