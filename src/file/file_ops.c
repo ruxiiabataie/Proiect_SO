@@ -91,7 +91,7 @@ int remove_report_file(const char *district, int id) {
     if (fd < 0) return -1;
 
     Report r;
-    off_t pos = 0;
+    //off_t pos = 0;
 
     while (read(fd, &r, sizeof(Report)) > 0) {
 
@@ -112,7 +112,7 @@ int remove_report_file(const char *district, int id) {
             return 1;
         }
 
-        pos += sizeof(Report);
+        //pos += sizeof(Report);
     }
 
     close(fd);

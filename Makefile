@@ -1,4 +1,5 @@
 CC = gcc
+
 CFLAGS = -Wall -Wextra
 
 SRC = \
@@ -10,11 +11,23 @@ src/permissions/permissions.c
 
 OUT = city_manager
 
-all:
-	$(CC) $(SRC) -o $(OUT)
+all: $(OUT) monitor city_hub scorer
 
-clean:
-	rm -f $(OUT)
+$(OUT):
+	$(CC) $(CFLAGS) $(SRC) -o $(OUT)
 
 monitor:
-	$(CC) src/monitor_reports.c -o monitor_reports
+	$(CC) $(CFLAGS) src/monitor_reports.c -o monitor_reports
+
+city_hub:
+	$(CC) $(CFLAGS) src/city_hub.c -o city_hub
+
+scorer:
+	$(CC) $(CFLAGS) src/scorer.c -o scorer
+
+clean:
+	rm -f \
+	$(OUT) \
+	monitor_reports \
+	city_hub \
+	scorer

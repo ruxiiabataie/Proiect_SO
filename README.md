@@ -1,32 +1,119 @@
-# 🏙️ City Manager – OS Project (Phase 1)
+# City Manager – UNIX Operating Systems Project
 
-## 📌 Overview
+## Overview
 
-This project implements a UNIX-based C application for managing city infrastructure reports (e.g. damaged roads, broken lighting, flooding).
+City Manager is a UNIX-based C application that simulates a city infrastructure issue reporting and monitoring system.
 
-The system allows inspectors to submit reports and managers to monitor, update, and control access to them.
+Inspectors can submit infrastructure reports (damaged roads, flooding, broken lighting, etc.), while managers can supervise districts, update configuration files, remove reports, and manage monitoring services.
 
-The application simulates a real-world system using:
+The project was developed incrementally across three phases focused on:
 
-* low-level file operations (`open`, `read`, `write`, `lseek`)
-* file permissions (`chmod`, `stat`)
-* symbolic links
-* structured binary data
+* file systems
+* permissions
+* binary file manipulation
+* processes and signals
+* pipes and I/O redirection
+* inter-process communication (IPC)
+
+The application uses low-level UNIX system calls extensively.
 
 ---
 
-## 👥 User Roles
+# Phase Structure
 
-The system supports two roles:
+## Phase 1 – File Systems
 
-* **Inspector**
+Implemented:
 
-  * can add, view, list, and filter reports
-* **Manager**
+* binary report storage
+* district directories
+* configuration files
+* operation logs
+* symbolic links
+* permission management
+* report filtering
 
-  * full access, including removing reports and updating configuration
+System calls used:
 
-Roles are passed via CLI:
+* open
+* read
+* write
+* lseek
+* ftruncate
+* stat
+* lstat
+* mkdir
+* chmod
+* symlink
+* unlink
+
+---
+
+## Phase 2 – Processes and Signals
+
+Implemented:
+
+* district removal using child processes + exec
+* monitor process (`monitor_reports`)
+* PID file management
+* signal handling (`SIGUSR1`, `SIGINT`)
+* monitor notification when new reports are added
+
+System calls used:
+
+* fork
+* exec
+* kill
+* sigaction
+* unlink
+
+---
+
+## Phase 3 – Pipes and Redirects
+
+Implemented:
+
+* interactive `city_hub`
+* monitor launching through pipes
+* IPC using `pipe()`
+* output redirection with `dup2()`
+* multiple scorer processes
+* workload score computation per inspector
+
+System calls used:
+
+* pipe
+* dup2
+* fork
+* exec
+* read
+* write
+
+---
+
+# User Roles
+
+The application supports two roles.
+
+## Inspector
+
+Can:
+
+* add reports
+* list reports
+* view reports
+* filter reports
+
+## Manager
+
+Has full access:
+
+* remove reports
+* update thresholds
+* remove districts
+* manage monitoring operations
+
+Example:
 
 ```bash
 ./city_manager --role inspector --user bob --list downtown
@@ -34,31 +121,44 @@ Roles are passed via CLI:
 
 ---
 
-## 📂 Project Structure
+# Project Structure
 
-```
-city_manager/
+```text
+CITY_MANAGER/
 │
 ├── src/
 │   ├── main.c
+│   ├── city_hub.c
+│   ├── monitor_reports.c
+│   ├── scorer.c
+│   │
+│   ├── commands/
+│   ├── file/
+│   ├── filter/
+│   ├── permissions/
+│   ├── models/
 │
-│   ├── commands/        # CLI command logic
-│   ├── file/            # low-level file operations
-│   ├── permissions/     # permission handling (stat, chmod)
-│   ├── filter/          # condition parsing & matching
-│   ├── utils/           # helper functions
-│   ├── models/          # data structures (Report)
+├── downtown/
+├── uptown/
+│
+├── active_reports-downtown
+├── active_reports-uptown
 │
 ├── Makefile
-├── ai_usage.md
 ├── README.md
+├── AI_usage-ALL-phases.md
+│
+├── city_manager
+├── city_hub
+├── monitor_reports
+├── scorer
 ```
 
 ---
 
-## 🧱 Data Model
+# Report Structure
 
-Each report is stored as a fixed-size struct in a binary file:
+Each report is stored as a fixed-size binary struct:
 
 ```c
 typedef struct {
@@ -73,104 +173,375 @@ typedef struct {
 } Report;
 ```
 
+Reports are stored sequentially in:
+
+```text
+reports.dat
+```
+
+using binary I/O.
+
 ---
 
-## 📁 Disk Layout
+# District Layout
 
 Each district has its own directory:
 
-```
-<district_id>/
-├── reports.dat        # binary file (reports)
-├── district.cfg       # configuration (severity threshold)
-├── logged_district    # operation log
+```text
+<district>/
+├── reports.dat
+├── district.cfg
+├── logged_district
 ```
 
-Additionally, a symbolic link is created:
+Additionally, symbolic links are created:
 
-```
-active_reports-<district_id> -> <district_id>/reports.dat
+```text
+active_reports-<district> -> <district>/reports.dat
 ```
 
 ---
 
-## 🔐 File Permissions
+# Permission System
 
-| File            | Permissions | Description                          |
-| --------------- | ----------- | ------------------------------------ |
-| Directory       | 750         | manager full, inspector read/execute |
-| reports.dat     | 664         | both can read/write                  |
-| district.cfg    | 640         | manager write, inspector read        |
-| logged_district | 644         | everyone read, manager write         |
+The program explicitly sets and validates UNIX permission bits.
 
-Permissions are:
+| File               | Permissions | Purpose                   |
+| ------------------ | ----------- | ------------------------- |
+| district directory | 750         | manager full access       |
+| reports.dat        | 664         | both roles may read/write |
+| district.cfg       | 640         | manager write only        |
+| logged_district    | 644         | everyone read             |
 
-* explicitly set using `chmod()`
-* validated using `stat()` before operations
+Permissions are checked using:
 
----
-
-## ⚙️ Implemented / Planned Commands
-
-* `add <district>` → add report
-* `list <district>` → list all reports
-* `view <district> <id>` → view specific report
-* `remove_report <district> <id>` → manager only
-* `update_threshold <district> <value>` → manager only
-* `filter <district> <conditions>` → filter reports
+* stat()
+* st_mode
+* permission macros
 
 ---
 
-## 🔍 Filter System (AI-assisted)
+# Implemented Commands
 
-Conditions format:
+## city_manager
 
-```
-field:operator:value
+### Add report
+
+```bash
+./city_manager --role inspector --user alice --add downtown
 ```
 
-Examples:
+---
 
+### List reports
+
+```bash
+./city_manager --role inspector --user bob --list downtown
 ```
-severity:>=:2
-category:==:road
+
+Displays:
+
+* all reports
+* file permissions
+* file size
+* modification time
+
+---
+
+### View report
+
+```bash
+./city_manager --role inspector --user bob --view downtown 17
 ```
 
-AI is used to generate:
+---
 
-* `parse_condition()`
-* `match_condition()`
+### Remove report
 
-All integration logic is implemented manually.
+```bash
+./city_manager --role manager --user alice --remove_report downtown 17
+```
+
+Uses:
+
+* lseek()
+* ftruncate()
+
+to shift records and shrink the binary file.
 
 ---
 
-## 🧠 Key Concepts Used
+### Update threshold
 
-* Binary file manipulation
-* File metadata and permissions
-* Symbolic links (`symlink`, `lstat`)
-* Process-safe file operations
-* Modular C architecture
+```bash
+./city_manager --role manager --user alice --update_threshold downtown 3
+```
 
 ---
 
-## 🚧 Current Status
+### Filter reports
 
-* [x] Project structure created
-* [ ] Report struct defined
-* [ ] Add command
-* [ ] List command
-* [ ] Remove report logic
-* [ ] Filter system
-* [ ] Permission validation
-* [ ] Symlink handling
+```bash
+./city_manager --role inspector --user bob --filter downtown severity:>=:2
+```
+
+Supported fields:
+
+* severity
+* category
+* inspector
+* timestamp
+
+Supported operators:
+
+* ==
+* !=
+* <
+* <=
+* >
+* > =
 
 ---
 
-## 📝 Notes
+### Remove district
 
-This project is part of the Operating Systems course.
-Each phase builds upon the previous one — failing a phase results in failing the entire project.
+```bash
+./city_manager --role manager --user alice --remove_district uptown
+```
+
+Implemented using:
+
+* fork()
+* exec()
+* external rm -rf
 
 ---
+
+# monitor_reports
+
+The monitor process:
+
+* creates `.monitor_pid`
+* waits for signals
+* reacts to `SIGUSR1`
+* ends only on `SIGINT`
+
+Example output:
+
+```text
+Monitor started. PID: 12345
+New report added!
+Monitor shutting down...
+```
+
+---
+
+# city_hub
+
+`city_hub` provides an interactive shell interface.
+
+Run:
+
+```bash
+./city_hub
+```
+
+---
+
+# Supported Commands
+
+## Start monitor
+
+```text
+start_monitor
+```
+
+Creates:
+
+* child processes
+* pipes
+* redirected monitor output
+
+---
+
+## Stop monitor
+
+```text
+stop_monitor
+```
+
+Sends:
+
+* SIGINT
+
+to the monitor process.
+
+---
+
+## Calculate scores
+
+```text
+calculate_scores downtown uptown
+```
+
+Creates:
+
+* one scorer process per district
+* one pipe per scorer
+
+Each scorer computes:
+
+```text
+workload score = sum of severity levels
+```
+
+per inspector.
+
+Example:
+
+```text
+District: downtown
+
+alice -> 2
+bob -> 8
+```
+
+---
+
+## Exit
+
+```text
+exit
+```
+
+---
+
+# Inter-Process Communication
+
+The project uses:
+
+* pipe()
+* dup2()
+* fork()
+* exec()
+
+for communication between:
+
+* city_hub
+* monitor_reports
+* scorer
+
+---
+
+# AI-Assisted Components
+
+AI assistance was used for:
+
+* filter condition parsing
+* filter condition matching
+* debugging IPC
+* signal handling debugging
+* process management debugging
+
+All AI interactions and modifications are documented in:
+
+```text
+AI_usage-ALL-phases.md
+```
+
+---
+
+# Build Instructions
+
+Compile all executables:
+
+```bash
+make
+```
+
+Clean executables:
+
+```bash
+make clean
+```
+
+---
+
+# Running the Programs
+
+## city_manager
+
+```bash
+./city_manager --role inspector --user alice --add downtown
+```
+
+---
+
+## city_hub
+
+```bash
+./city_hub
+```
+
+---
+
+# Example city_hub Session
+
+```text
+city_hub> start_monitor
+
+FROM MONITOR: Monitor started. PID: 97233
+
+Monitor launched successfully
+
+city_hub> calculate_scores downtown uptown
+
+Processing district: downtown
+
+alice -> 2
+bob -> 8
+
+Processing district: uptown
+
+alice -> 3
+bob -> 5
+
+city_hub> stop_monitor
+
+Monitor stopped successfully
+```
+
+---
+
+# Concepts Used
+
+* binary file management
+* UNIX permissions
+* symbolic links
+* process creation
+* signal handling
+* pipes
+* stdout redirection
+* inter-process communication
+* fixed-size record storage
+* low-level UNIX system calls
+
+---
+
+# Deliverables Included
+
+* city_manager
+* monitor_reports
+* city_hub
+* scorer
+* district directories
+* symlinks
+* operation logs
+* Makefile
+* AI usage documentation
+
+---
+
+# Notes
+
+This project was developed for the Operating Systems course and follows all three required phases from the official specification.
